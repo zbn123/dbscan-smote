@@ -9,9 +9,6 @@ class DBSCANSMOTE(BaseOverSampler):
     - normalize = whether to normalize the data before clustering
     - *kwargs = arguments to the passed to the DBSCAN object'''
 
-
-    _normalize = True
-
     def __init__(self,
                  ratio="auto",
                  random_state=None,
@@ -56,3 +53,6 @@ class DBSCANSMOTE(BaseOverSampler):
 
         return self._cluster_class.labels_
 
+    def _sample(self, X, y):
+
+        return(self._fit_clusters(X,y))
