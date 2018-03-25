@@ -1,6 +1,7 @@
-from imblearn.over_sampling.base import  BaseOverSampler
+from imblearn.over_sampling.base import BaseOverSampler
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import MinMaxScaler
+import numpy as np
 
 
 class DBSCANSMOTE(BaseOverSampler):
@@ -40,7 +41,7 @@ class DBSCANSMOTE(BaseOverSampler):
         else:
             self._cluster_class = dbscan_object
 
-    def _fit_clusters(self, X, y=None):
+    def _fit_cluster(self, X, y=None):
         ''' Applies DBSCAN on the input data, return the cluster labels'''
 
         if self._normalize:
@@ -51,8 +52,58 @@ class DBSCANSMOTE(BaseOverSampler):
 
         self._cluster_class.fit(X_, y)
 
-        return self._cluster_class.labels_
+    def _calculate_imb_ratio(self, X , y, cluster_labels = None):
+        '''
+        Calculate the imbalance ratio for each cluster.
+        Right now it only allows for the binary case
+        :param X:
+        :param y: the vector with target observation
+        :param minority_label:
+        :param cluster_labels:
+        :return:
+        '''
+
+        if cluster_labels is None:
+            cluster_labels = self._cluster_class.labels_
+
+        minority_label = self._find_minority_label(y)
+
+        unique_labels = np.unique(cluster_labels)
+
+        # Remove label of obs identified as noise:
+        unique_labels = unique_labels[unique_labels != -1]
+
+        imbalance_ratio = {}
+
+        for label in unique_labels:
+            cluster_obs = y[cluster_labels == label]
+
+            minority_obs = cluster_obs[cluster_obs == minority_label].size
+            majority_obs = cluster_obs[cluster_obs != minority_label].size
+
+
+            # To prevent division by zero:
+            if majority_obs == 0:
+                majority_obs = 1
+
+            imb_ratio = minority_obs / majority_obs
+
+            imbalance_ratio[label] = imb_ratio
+
+        return imbalance_ratio
 
     def _sample(self, X, y):
+        self._fit_cluster(X, y)
 
-        return(self._fit_clusters(X,y))
+        return self._calculate_imb_ratio(X, y)
+
+
+    def _find_minority_label(self, y):
+        (values,counts) = np.unique(y,return_counts=True)
+        ind=np.argmin(counts)
+
+        return values[ind]
+
+    def get_labels(self):
+
+        return self._cluster_class.labels_
