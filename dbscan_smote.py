@@ -9,16 +9,42 @@ class DBSCANSMOTE(BaseOverSampler):
     - normalize = whether to normalize the data before clustering
     - *kwargs = arguments to the passed to the DBSCAN object'''
 
-    _cluster_class = DBSCAN()
+
     _normalize = True
 
-    def __init__(self, ratio="auto", random_state=None, normalize = True,  *kwargs):
+    def __init__(self,
+                 ratio="auto",
+                 random_state=None,
+                 normalize = True,
+                 eps=0.5,
+                 min_samples=5,
+                 metric= 'euclidean',
+                 metric_params=None,
+                 algorithm='auto',
+                 leaf_size=30,
+                 p=None,
+                 n_jobs=1,
+                 dbscan_object=None):
 
         super(DBSCANSMOTE, self).__init__(ratio=ratio, random_state=random_state)
         self._normalize = normalize
-        self._cluster_class = DBSCAN(*kwargs)
+
+        if dbscan_object is None:
+            self._cluster_class = DBSCAN(
+                eps=eps,
+                min_samples=min_samples,
+                metric=metric,
+                metric_params=metric_params,
+                algorithm=algorithm,
+                leaf_size=leaf_size,
+                p=p,
+                n_jobs=n_jobs
+            )
+        else:
+            self._cluster_class = dbscan_object
 
     def _fit_clusters(self, X, y=None):
+        ''' Applies DBSCAN on the input data, return the cluster labels'''
 
         if self._normalize:
             min_max = MinMaxScaler()
