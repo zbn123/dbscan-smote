@@ -5,18 +5,15 @@ import numpy as np
 
 
 class DBSCANSMOTE(BaseOverSampler):
-    ''' Clusters the input data using DBScan and then oversamples using smote the defined clusters
-    PARAMETERS:
-    - normalize = whether to normalize the data before clustering
-    - *kwargs = arguments to the passed to the DBSCAN object'''
+    ''' Clusters the input data using DBScan and then oversamples using smote the defined clusters'''
 
     def __init__(self,
                  ratio="auto",
                  random_state=None,
-                 normalize = True,
+                 normalize=True,
                  eps=0.5,
                  min_samples=5,
-                 metric= 'euclidean',
+                 metric='euclidean',
                  metric_params=None,
                  algorithm='auto',
                  leaf_size=30,
@@ -42,7 +39,8 @@ class DBSCANSMOTE(BaseOverSampler):
             self._cluster_class = dbscan_object
 
     def _fit_cluster(self, X, y=None):
-        ''' Applies DBSCAN on the input data, return the cluster labels'''
+        ''' Normalizes the data into a [0,1] range,
+        then applies DBSCAN on the input data'''
 
         if self._normalize:
             min_max = MinMaxScaler()
@@ -52,7 +50,7 @@ class DBSCANSMOTE(BaseOverSampler):
 
         self._cluster_class.fit(X_, y)
 
-    def _calculate_imb_ratio(self, X , y, cluster_labels = None):
+    def _calculate_imb_ratio(self, X, y, cluster_labels=None):
         '''
         Calculate the imbalance ratio for each cluster.
         Right now it only allows for the binary case
@@ -66,7 +64,7 @@ class DBSCANSMOTE(BaseOverSampler):
         if cluster_labels is None:
             cluster_labels = self._cluster_class.labels_
 
-        minority_label = self._find_minority_label(y)
+        minority_label = self.minority_class
 
         unique_labels = np.unique(cluster_labels)
 
@@ -81,8 +79,7 @@ class DBSCANSMOTE(BaseOverSampler):
             minority_obs = cluster_obs[cluster_obs == minority_label].size
             majority_obs = cluster_obs[cluster_obs != minority_label].size
 
-
-            # To prevent division by zero:
+            #To prevent division by zero errors
             if majority_obs == 0:
                 majority_obs = 1
 
@@ -94,16 +91,17 @@ class DBSCANSMOTE(BaseOverSampler):
 
     def _sample(self, X, y):
         self._fit_cluster(X, y)
+        self.minority_class = self._find_minority_label(y)
 
         return self._calculate_imb_ratio(X, y)
 
-
     def _find_minority_label(self, y):
-        (values,counts) = np.unique(y,return_counts=True)
-        ind=np.argmin(counts)
+        (values, counts) = np.unique(y, return_counts=True)
+        ind = np.argmin(counts)
 
         return values[ind]
 
     def get_labels(self):
+        '''Returns the cluster labels of the fitted data'''
 
         return self._cluster_class.labels_
