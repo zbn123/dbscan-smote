@@ -3,3 +3,4 @@ test/.ipynb_checkpoints/*
 test/Untitled.ipynb
 __pycache__/*
 documentation/
+test/

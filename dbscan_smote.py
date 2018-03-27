@@ -86,7 +86,7 @@ class DBSCANSMOTE(BaseOverSampler):
 
         return filtered_clusters
 
-    def _calculate_sampling_weight(self, X, y, filtered_clusters, cluster_labels = None):
+    def _calculate_sampling_weights(self, X, y, filtered_clusters, cluster_labels = None):
 
         if cluster_labels is None:
             cluster_labels = self.labels
@@ -125,15 +125,21 @@ class DBSCANSMOTE(BaseOverSampler):
 
 
     def _sample(self, X, y):
+
+        # Create the clusters and set the labels
         self._fit_cluster(X, y)
 
         self.labels = self._cluster_class.labels_
 
+        # Finds the minority class
+        # To be re written for the multiclass case
         self.minority_class = self._find_minority_label(y)
 
+        # Filters the clusters using the method in K Means SMOTE
         clusters_to_use = self._filter_clusters(X, y, self._cluster_class.labels_)
 
-        return self._calculate_sampling_weight(X, y, clusters_to_use)
+        # Calculates the sampling weights
+        sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use)
 
     def _find_minority_label(self, y):
         (values, counts) = np.unique(y, return_counts=True)
