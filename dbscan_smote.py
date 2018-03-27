@@ -2,6 +2,7 @@ from imblearn.over_sampling.base import BaseOverSampler
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
+from scipy.spatial.distance import pdist
 
 
 class DBSCANSMOTE(BaseOverSampler):
@@ -62,7 +63,7 @@ class DBSCANSMOTE(BaseOverSampler):
         '''
 
         if cluster_labels is None:
-            cluster_labels = self._cluster_class.labels_
+            cluster_labels = self.labels
 
         minority_label = self.minority_class
 
@@ -82,15 +83,66 @@ class DBSCANSMOTE(BaseOverSampler):
             imb_ratio =  (majority_obs + 1) / (minority_obs + 1)
 
             if (imb_ratio) < 1:
+                print("Cluster {} is to used, because it has {} imbalance ratio".format(label, imb_ratio))
                 filtered_clusters.append(label)
 
         return filtered_clusters
 
+    def _calculate_samping_weight(self, X, y, filtered_clusters, cluster_labels = None):
+
+        if cluster_labels is None:
+            cluster_labels = self.labels
+
+        sparsity_factors = {}
+
+        for cluster in filtered_clusters:
+
+            # Observations beloging to current cluster and from the minority class
+            obs = np.all([cluster_labels == cluster , y == self.minority_class], axis = 0)
+            n_obs = obs.sum()
+
+            cluster_X = X[obs]
+
+            distance = pdist(cluster_X, 'euclidean')
+
+            average_minority_distance = np.mean(distance)
+
+            density_factor = average_minority_distance / n_obs
+
+            sparsity_factor = 1 / density_factor
+
+            sparsity_factors[cluster] = sparsity_factor
+
+
+        print(sparsity_factors)
+
+
+        sparsity_sum = sum(sparsity_factors.values())
+
+        sampling_weights = {}
+
+        for cluster, sparsity_factor in sparsity_factors:
+            sampling_weights[cluster]: sparsity_factor / sparsity_sum
+
+        return sampling_weights
+
+
+
+
     def _sample(self, X, y):
         self._fit_cluster(X, y)
+
+        self.labels = self._cluster_class.labels_
+
         self.minority_class = self._find_minority_label(y)
 
-        return self._calculate_imb_ratio(X, y)
+        clusters_to_use = self._filter_clusters(X, y, self._cluster_class.labels_)
+
+
+
+
+
+        return self._calculate_samping_weight(X, y, clusters_to_use)
 
     def _find_minority_label(self, y):
         (values, counts) = np.unique(y, return_counts=True)
