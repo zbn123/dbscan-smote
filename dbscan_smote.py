@@ -50,7 +50,7 @@ class DBSCANSMOTE(BaseOverSampler):
 
         self._cluster_class.fit(X_, y)
 
-    def _calculate_imb_ratio(self, X, y, cluster_labels=None):
+    def _filter_clusters(self, X, y, cluster_labels=None):
         '''
         Calculate the imbalance ratio for each cluster.
         Right now it only allows for the binary case
@@ -68,10 +68,10 @@ class DBSCANSMOTE(BaseOverSampler):
 
         unique_labels = np.unique(cluster_labels)
 
-        # Remove label of obs identified as noise:
+        # Remove label of observations identified as noise:
         unique_labels = unique_labels[unique_labels != -1]
 
-        imbalance_ratio = {}
+        filtered_clusters = []
 
         for label in unique_labels:
             cluster_obs = y[cluster_labels == label]
@@ -79,15 +79,12 @@ class DBSCANSMOTE(BaseOverSampler):
             minority_obs = cluster_obs[cluster_obs == minority_label].size
             majority_obs = cluster_obs[cluster_obs != minority_label].size
 
-            #To prevent division by zero errors
-            if majority_obs == 0:
-                majority_obs = 1
+            imb_ratio =  (majority_obs + 1) / (minority_obs + 1)
 
-            imb_ratio = minority_obs / majority_obs
+            if (imb_ratio) < 1:
+                filtered_clusters.append(label)
 
-            imbalance_ratio[label] = imb_ratio
-
-        return imbalance_ratio
+        return filtered_clusters
 
     def _sample(self, X, y):
         self._fit_cluster(X, y)
