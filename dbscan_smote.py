@@ -34,8 +34,7 @@ class DBSCANSMOTE(BaseOverSampler):
                 algorithm=algorithm,
                 leaf_size=leaf_size,
                 p=p,
-                n_jobs=n_jobs
-            )
+                n_jobs=n_jobs)
         else:
             self._cluster_class = dbscan_object
 
@@ -82,13 +81,12 @@ class DBSCANSMOTE(BaseOverSampler):
 
             imb_ratio =  (majority_obs + 1) / (minority_obs + 1)
 
-            if (imb_ratio) < 1:
-                print("Cluster {} is to used, because it has {} imbalance ratio".format(label, imb_ratio))
+            if imb_ratio < 1:
                 filtered_clusters.append(label)
 
         return filtered_clusters
 
-    def _calculate_samping_weight(self, X, y, filtered_clusters, cluster_labels = None):
+    def _calculate_sampling_weight(self, X, y, filtered_clusters, cluster_labels = None):
 
         if cluster_labels is None:
             cluster_labels = self.labels
@@ -97,8 +95,8 @@ class DBSCANSMOTE(BaseOverSampler):
 
         for cluster in filtered_clusters:
 
-            # Observations beloging to current cluster and from the minority class
-            obs = np.all([cluster_labels == cluster , y == self.minority_class], axis = 0)
+            # Observations belonging to current cluster and from the minority class
+            obs = np.all([cluster_labels == cluster, y == self.minority_class], axis=0)
             n_obs = obs.sum()
 
             cluster_X = X[obs]
@@ -107,22 +105,19 @@ class DBSCANSMOTE(BaseOverSampler):
 
             average_minority_distance = np.mean(distance)
 
-            density_factor = average_minority_distance / n_obs
+            density_factor = average_minority_distance / (n_obs**2)
 
             sparsity_factor = 1 / density_factor
 
             sparsity_factors[cluster] = sparsity_factor
 
-
-        print(sparsity_factors)
-
-
         sparsity_sum = sum(sparsity_factors.values())
+
 
         sampling_weights = {}
 
-        for cluster, sparsity_factor in sparsity_factors:
-            sampling_weights[cluster]: sparsity_factor / sparsity_sum
+        for cluster in sparsity_factors:
+            sampling_weights[cluster] = sparsity_factors[cluster] / sparsity_sum
 
         return sampling_weights
 
@@ -138,11 +133,7 @@ class DBSCANSMOTE(BaseOverSampler):
 
         clusters_to_use = self._filter_clusters(X, y, self._cluster_class.labels_)
 
-
-
-
-
-        return self._calculate_samping_weight(X, y, clusters_to_use)
+        return self._calculate_sampling_weight(X, y, clusters_to_use)
 
     def _find_minority_label(self, y):
         (values, counts) = np.unique(y, return_counts=True)
