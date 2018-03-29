@@ -51,7 +51,7 @@ class DBSCANSMOTE(BaseOverSampler):
 
         self._cluster_class.fit(X_, y)
 
-    def _filter_clusters(self, X, y, cluster_labels=None):
+    def _filter_clusters(self, y, cluster_labels=None, minority_label=None):
         '''
         Calculate the imbalance ratio for each cluster.
         Right now it only allows for the binary case
@@ -65,7 +65,8 @@ class DBSCANSMOTE(BaseOverSampler):
         if cluster_labels is None:
             cluster_labels = self.labels
 
-        minority_label = self.minority_class
+        if minority_label is None:
+            minority_label = self.minority_class
 
         unique_labels = np.unique(cluster_labels)
 
@@ -139,10 +140,10 @@ class DBSCANSMOTE(BaseOverSampler):
         self.minority_class = self._find_minority_label(y)
 
         # Filters the clusters using the method in K Means SMOTE
-        clusters_to_use = self._filter_clusters(X, y, self._cluster_class.labels_)
+        clusters_to_use = self._filter_clusters(y, self._cluster_class.labels_, self.minority_class)
 
         # Calculates the sampling weights
-        sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use)
+        sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use, self.labels)
 
         n_to_generate = self.ratio_[self.minority_class]
 
@@ -162,9 +163,6 @@ class DBSCANSMOTE(BaseOverSampler):
 
                 n_new = n_to_generate * sampling_weights[cluster]
 
-                print("Cluster: {} has {} obs, {} minority obs and a sampling weight of {}, so {} samples should be added".
-                      format(cluster, n_obs, minority_obs.size, sampling_weights[cluster], n_new))
-
                 temp_dic = {self.minority_class: int(round(n_new) + minority_obs.size)}
 
                 # We need to make sure that k neighors is less that the number of observations in the cluster
@@ -174,9 +172,12 @@ class DBSCANSMOTE(BaseOverSampler):
                 over_sampler.fit(X_c, y_c)
 
                 X_r, y_r = over_sampler.sample(X_c, y_c)
+
+                # Save the newly generated samples only
                 X_r = X_r[n_obs:, :]
                 y_r = y_r[n_obs:, ]
 
+                # Add the newly generated samples to the data to be returned
                 X_resampled = np.concatenate((X_resampled, X_r))
                 y_resampled = np.concatenate((y_resampled, y_r))
 
