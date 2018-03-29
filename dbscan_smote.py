@@ -4,6 +4,7 @@ from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 from scipy.spatial.distance import pdist
 from imblearn.over_sampling import SMOTE
+from warnings import filterwarnings
 
 
 class DBSCANSMOTE(BaseOverSampler):
@@ -149,6 +150,8 @@ class DBSCANSMOTE(BaseOverSampler):
 
         X_resampled = X.copy()
         y_resampled = y.copy()
+
+        filterwarnings("ignore", category=UserWarning, module="imblearn")
 
         for cluster in sampling_weights:
             mask = self.labels == cluster
