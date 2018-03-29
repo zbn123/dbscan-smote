@@ -3,6 +3,7 @@ from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 from scipy.spatial.distance import pdist
+from imblearn.over_sampling import SMOTE
 
 
 class DBSCANSMOTE(BaseOverSampler):
@@ -79,24 +80,27 @@ class DBSCANSMOTE(BaseOverSampler):
             minority_obs = cluster_obs[cluster_obs == minority_label].size
             majority_obs = cluster_obs[cluster_obs != minority_label].size
 
-            imb_ratio =  (majority_obs + 1) / (minority_obs + 1)
+            imb_ratio = (majority_obs + 1) / (minority_obs + 1)
 
             if imb_ratio < 1:
                 filtered_clusters.append(label)
 
         return filtered_clusters
 
-    def _calculate_sampling_weights(self, X, y, filtered_clusters, cluster_labels = None):
+    def _calculate_sampling_weights(self, X, y, filtered_clusters, cluster_labels=None, minority_class=None):
 
         if cluster_labels is None:
             cluster_labels = self.labels
+
+        if minority_class is None:
+            minority_class = self.minority_class
 
         sparsity_factors = {}
 
         for cluster in filtered_clusters:
 
             # Observations belonging to current cluster and from the minority class
-            obs = np.all([cluster_labels == cluster, y == self.minority_class], axis=0)
+            obs = np.all([cluster_labels == cluster, y == minority_class], axis=0)
             n_obs = obs.sum()
 
             cluster_X = X[obs]
@@ -116,16 +120,12 @@ class DBSCANSMOTE(BaseOverSampler):
 
         sparsity_sum = sum(sparsity_factors.values())
 
-
         sampling_weights = {}
 
         for cluster in sparsity_factors:
             sampling_weights[cluster] = sparsity_factors[cluster] / sparsity_sum
 
         return sampling_weights
-
-
-
 
     def _sample(self, X, y):
 
@@ -146,25 +146,41 @@ class DBSCANSMOTE(BaseOverSampler):
 
         n_to_generate = self.ratio_[self.minority_class]
 
+        X_resampled = X.copy()
+        y_resampled = y.copy()
+
         for cluster in sampling_weights:
             mask = self.labels == cluster
             X_c = X[mask]
             y_c = y[mask]
 
-            n_obs = mask.sum()
+            # There needs to be at least two unique values of the target variable
+            if np.unique(y_c).size > 1:
+                n_obs = mask.sum()
 
-            n_new = n_to_generate * sampling_weights[cluster]
+                minority_obs = y_c[y_c == self.minority_class]
 
-            print("Cluster: {} has {} obs and a sampling weight of {}, so {} samples should be added". format(cluster, n_obs, sampling_weights[cluster], n_new))
+                n_new = n_to_generate * sampling_weights[cluster]
 
-            temp_dic = self.ratio_.copy()
+                print("Cluster: {} has {} obs, {} minority obs and a sampling weight of {}, so {} samples should be added".
+                      format(cluster, n_obs, minority_obs.size, sampling_weights[cluster], n_new))
 
-            temp_dic[self.minority_class] = round(n_new)
+                temp_dic = {self.minority_class: int(round(n_new) + minority_obs.size)}
 
-            print(temp_dic)
+                # We need to make sure that k neighors is less that the number of observations in the cluster
+                k_neighbors = minority_obs.size - 1
 
-        return sampling_weights
+                over_sampler = SMOTE(ratio=temp_dic, k_neighbors=k_neighbors, random_state=0)
+                over_sampler.fit(X_c, y_c)
 
+                X_r, y_r = over_sampler.sample(X_c, y_c)
+                X_r = X_r[n_obs:, :]
+                y_r = y_r[n_obs:, ]
+
+                X_resampled = np.concatenate((X_resampled, X_r))
+                y_resampled = np.concatenate((y_resampled, y_r))
+
+        return X_resampled, y_resampled
 
     def _find_minority_label(self, y):
         (values, counts) = np.unique(y, return_counts=True)
