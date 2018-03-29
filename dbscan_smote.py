@@ -68,7 +68,7 @@ class DBSCANSMOTE(BaseOverSampler):
 
         unique_labels = np.unique(cluster_labels)
 
-        # Remove label of observations identified as noise:
+        # Remove label of observations identified as noise by DBSCAN:
         unique_labels = unique_labels[unique_labels != -1]
 
         filtered_clusters = []
@@ -101,6 +101,9 @@ class DBSCANSMOTE(BaseOverSampler):
 
             cluster_X = X[obs]
 
+            # pdist calculates the condensed distance matrix, which is the upper triangle of the regular distance matrix
+            # We can just calculate the mean over that vector, considering that that d(a,b) only exists once ( d(b,a) and
+            # d(a,a) is not present).
             distance = pdist(cluster_X, 'euclidean')
 
             average_minority_distance = np.mean(distance)
@@ -140,6 +143,28 @@ class DBSCANSMOTE(BaseOverSampler):
 
         # Calculates the sampling weights
         sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use)
+
+        n_to_generate = self.ratio_[self.minority_class]
+
+        for cluster in sampling_weights:
+            mask = self.labels == cluster
+            X_c = X[mask]
+            y_c = y[mask]
+
+            n_obs = mask.sum()
+
+            n_new = n_to_generate * sampling_weights[cluster]
+
+            print("Cluster: {} has {} obs and a sampling weight of {}, so {} samples should be added". format(cluster, n_obs, sampling_weights[cluster], n_new))
+
+            temp_dic = self.ratio_.copy()
+
+            temp_dic[self.minority_class] = round(n_new)
+
+            print(temp_dic)
+
+        return sampling_weights
+
 
     def _find_minority_label(self, y):
         (values, counts) = np.unique(y, return_counts=True)
