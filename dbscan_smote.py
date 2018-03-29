@@ -155,31 +155,43 @@ class DBSCANSMOTE(BaseOverSampler):
             X_c = X[mask]
             y_c = y[mask]
 
+            n_obs = mask.sum()
+
+            artificial_index = -1
+
             # There needs to be at least two unique values of the target variable
-            if np.unique(y_c).size > 1:
-                n_obs = mask.sum()
+            if np.unique(y_c).size < 2:
+                art_x = np.zeros((1, X.shape[1]))
+                artificial_index = n_obs
 
-                minority_obs = y_c[y_c == self.minority_class]
+                X_c = np.r_[X_c, art_x]
+                y_c = np.r_[y_c, -255]
 
-                n_new = n_to_generate * sampling_weights[cluster]
+            minority_obs = y_c[y_c == self.minority_class]
 
-                temp_dic = {self.minority_class: int(round(n_new) + minority_obs.size)}
+            n_new = n_to_generate * sampling_weights[cluster]
 
-                # We need to make sure that k neighors is less that the number of observations in the cluster
-                k_neighbors = minority_obs.size - 1
+            temp_dic = {self.minority_class: int(round(n_new) + minority_obs.size)}
 
-                over_sampler = SMOTE(ratio=temp_dic, k_neighbors=k_neighbors, random_state=0)
-                over_sampler.fit(X_c, y_c)
+            # We need to make sure that k_neighors is less that the number of observations in the cluster
+            k_neighbors = minority_obs.size - 1
 
-                X_r, y_r = over_sampler.sample(X_c, y_c)
+            over_sampler = SMOTE(ratio=temp_dic, k_neighbors=k_neighbors, random_state=0)
+            over_sampler.fit(X_c, y_c)
 
-                # Save the newly generated samples only
-                X_r = X_r[n_obs:, :]
-                y_r = y_r[n_obs:, ]
+            X_r, y_r = over_sampler.sample(X_c, y_c)
 
-                # Add the newly generated samples to the data to be returned
-                X_resampled = np.concatenate((X_resampled, X_r))
-                y_resampled = np.concatenate((y_resampled, y_r))
+            if artificial_index > 0:
+                X_r = np.delete(X_r, artificial_index, axis = 0)
+                y_r = np.delete(y_r, artificial_index)
+
+            # Save the newly generated samples only
+            X_r = X_r[n_obs:, :]
+            y_r = y_r[n_obs:, ]
+
+            # Add the newly generated samples to the data to be returned
+            X_resampled = np.concatenate((X_resampled, X_r))
+            y_resampled = np.concatenate((y_resampled, y_r))
 
         return X_resampled, y_resampled
 
