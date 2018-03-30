@@ -25,16 +25,14 @@ class DBSCANSMOTE(BaseOverSampler):
 
         super(DBSCANSMOTE, self).__init__(ratio=ratio, random_state=random_state)
         self._normalize = normalize
-
-        self._cluster_class = DBSCAN(
-            eps=eps,
-            min_samples=min_samples,
-            metric=metric,
-            metric_params=metric_params,
-            algorithm=algorithm,
-            leaf_size=leaf_size,
-            p=p,
-            n_jobs=n_jobs)
+        self.eps = eps
+        self.min_samples = min_samples
+        self.metric = metric
+        self.metric_params = metric_params
+        self.algorithm = algorithm
+        self.leaf_size = leaf_size
+        self.p = p
+        self.n_jobs = n_jobs
 
 
     def _fit_cluster(self, X, y=None):
@@ -126,6 +124,7 @@ class DBSCANSMOTE(BaseOverSampler):
     def _sample(self, X, y):
 
         # Create the clusters and set the labels
+        self._set_DBSCAN()
         self._fit_cluster(X, y)
 
         self.labels = self._cluster_class.labels_
@@ -141,7 +140,7 @@ class DBSCANSMOTE(BaseOverSampler):
                 n_to_generate = self.ratio_[target_class]
 
                 clusters_to_use = self._filter_clusters(y, self._cluster_class.labels_, target_class)
-    
+
                 sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use, self.labels, target_class)
 
                 for cluster in sampling_weights:
@@ -200,3 +199,14 @@ class DBSCANSMOTE(BaseOverSampler):
         '''Returns the cluster labels of the fitted data'''
 
         return self._cluster_class.labels_
+
+    def _set_DBSCAN(self):
+        self._cluster_class = DBSCAN(
+            eps=self.eps,
+            min_samples=self.min_samples,
+            metric=self.metric,
+            metric_params=self.metric_params,
+            algorithm=self.algorithm,
+            leaf_size=self.leaf_size,
+            p=self.p,
+            n_jobs=self.n_jobs)
