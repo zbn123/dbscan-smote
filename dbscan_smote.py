@@ -4,8 +4,9 @@ from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 from scipy.spatial.distance import pdist
 from imblearn.over_sampling import SMOTE
-from warnings import filterwarnings, catch_warnings
-from sklearn.exceptions import  DataConversionWarning
+from warnings import filterwarnings, catch_warnings, warn
+from sklearn.exceptions import DataConversionWarning
+
 
 class DBSCANSMOTE(BaseOverSampler):
     ''' Clusters the input data using DBScan and then oversamples using smote the defined clusters'''
@@ -36,10 +37,13 @@ class DBSCANSMOTE(BaseOverSampler):
         self.k_neighbors = k_neighbors
         self.n_jobs = n_jobs
 
-
     def _fit_cluster(self, X, y=None):
-        ''' Normalizes the data into a [0,1] range,
-        then applies DBSCAN on the input data'''
+        """
+        Normalises the data fits a dbscan cluster object
+        :param X:
+        :param y:
+        :return:
+        """
 
         if self._normalize:
             min_max = MinMaxScaler()
@@ -53,15 +57,13 @@ class DBSCANSMOTE(BaseOverSampler):
         self._cluster_class.fit(X_, y)
 
     def _filter_clusters(self, y, cluster_labels=None, minority_label=None):
-        '''
-        Calculate the imbalance ratio for each cluster.
-        Right now it only allows for the binary case
-        :param X:
-        :param y: the vector with target observation
-        :param minority_label:
+        """
+        Calculates the clusters where the minority labels is dominant and returns them
+        :param y:
         :param cluster_labels:
+        :param minority_label:
         :return:
-        '''
+        """
 
         if cluster_labels is None:
             cluster_labels = self.labels
@@ -126,7 +128,7 @@ class DBSCANSMOTE(BaseOverSampler):
     def _sample(self, X, y):
 
         # Create the clusters and set the labels
-        self._set_DBSCAN()
+        self._set_cluster()
         self._fit_cluster(X, y)
 
         self.labels = self._cluster_class.labels_
@@ -145,7 +147,7 @@ class DBSCANSMOTE(BaseOverSampler):
 
                 # In case we do not have cluster where the target class it dominant, we apply regular SMOTE
                 if not clusters_to_use and n_to_generate > 0:
-
+                    warn("Class does not have a cluster where is dominant. Applying Regular SMOTE")
                     X_cluster = X.copy()
                     y_cluster = y.copy()
 
@@ -200,10 +202,9 @@ class DBSCANSMOTE(BaseOverSampler):
                         n_new = n_to_generate * sampling_weights[cluster]
 
                         temp_dic = {target_class: int(round(n_new) + minority_obs.size)}
-                        print("Other snote {}".format(temp_dic))
 
                         # We need to make sure that k_neighors is less than the number of observations in the cluster
-                        if self.k_neighbors > minority_obs.size -1 :
+                        if self.k_neighbors > minority_obs.size - 1:
                             k_neighbors = minority_obs.size - 1
                         else:
                             k_neighbors = self.k_neighbors
@@ -228,18 +229,11 @@ class DBSCANSMOTE(BaseOverSampler):
 
         return X_resampled, y_resampled
 
-    def _find_minority_label(self, y):
-        (values, counts) = np.unique(y, return_counts=True)
-        ind = np.argmin(counts)
-
-        return values[ind]
-
     def get_labels(self):
-        '''Returns the cluster labels of the fitted data'''
-
+        """Returns the labels of the data points"""
         return self._cluster_class.labels_
 
-    def _set_DBSCAN(self):
+    def _set_cluster(self):
         self._cluster_class = DBSCAN(
             eps=self.eps,
             min_samples=self.min_samples,
