@@ -138,20 +138,22 @@ class DBSCANSMOTE(BaseOverSampler):
             filterwarnings("ignore", category=UserWarning, module="imblearn")
 
             for target_class in self.ratio_:
-                print(self.ratio_)
 
                 n_to_generate = self.ratio_[target_class]
 
                 clusters_to_use = self._filter_clusters(y, self._cluster_class.labels_, target_class)
 
+                # In case we do not have cluster where the target class it dominant, we apply regular SMOTE
                 if not clusters_to_use and n_to_generate > 0:
-                    temp_dic = {target_class: n_to_generate}
+
                     X_cluster = X.copy()
                     y_cluster = y.copy()
 
                     n_obs = X_cluster.shape[0]
 
                     minority_obs = y_cluster[y_cluster == target_class]
+
+                    temp_dic = {target_class: n_to_generate + minority_obs.size}
 
                     if self.k_neighbors > minority_obs.size - 1:
                         k_neighbors = minority_obs.size - 1
@@ -198,6 +200,7 @@ class DBSCANSMOTE(BaseOverSampler):
                         n_new = n_to_generate * sampling_weights[cluster]
 
                         temp_dic = {target_class: int(round(n_new) + minority_obs.size)}
+                        print("Other snote {}".format(temp_dic))
 
                         # We need to make sure that k_neighors is less than the number of observations in the cluster
                         if self.k_neighbors > minority_obs.size -1 :
