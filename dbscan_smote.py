@@ -4,7 +4,7 @@ from sklearn.preprocessing import MinMaxScaler
 import numpy as np
 from scipy.spatial.distance import pdist
 from imblearn.over_sampling import SMOTE
-from warnings import filterwarnings
+from warnings import filterwarnings, catch_warnings
 from sklearn.exceptions import  DataConversionWarning
 
 class DBSCANSMOTE(BaseOverSampler):
@@ -44,8 +44,9 @@ class DBSCANSMOTE(BaseOverSampler):
         if self._normalize:
             min_max = MinMaxScaler()
             # When the input data is int it will give a warning when converting to double
-            filterwarnings("ignore", category=DataConversionWarning)
-            X_ = min_max.fit_transform(X)
+            with catch_warnings():
+                filterwarnings("ignore", category=DataConversionWarning)
+                X_ = min_max.fit_transform(X)
         else:
             X_ = X
 
@@ -132,59 +133,60 @@ class DBSCANSMOTE(BaseOverSampler):
         X_resampled = X.copy()
         y_resampled = y.copy()
 
-        filterwarnings("ignore", category=UserWarning, module="imblearn")
+        with catch_warnings():
+            filterwarnings("ignore", category=UserWarning, module="imblearn")
 
-        for target_class in self.ratio_:
+            for target_class in self.ratio_:
 
-            n_to_generate = self.ratio_[target_class]
+                n_to_generate = self.ratio_[target_class]
 
-            clusters_to_use = self._filter_clusters(y, self._cluster_class.labels_, target_class)
+                clusters_to_use = self._filter_clusters(y, self._cluster_class.labels_, target_class)
+    
+                sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use, self.labels, target_class)
 
-            sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use, self.labels, target_class)
+                for cluster in sampling_weights:
+                    mask = self.labels == cluster
+                    X_cluster = X[mask]
+                    y_cluster = y[mask]
 
-            for cluster in sampling_weights:
-                mask = self.labels == cluster
-                X_cluster = X[mask]
-                y_cluster = y[mask]
+                    n_obs = mask.sum()
 
-                n_obs = mask.sum()
+                    artificial_index = -1
 
-                artificial_index = -1
+                    # There needs to be at least two unique values of the target variable
+                    if np.unique(y_cluster).size < 2:
+                        art_x = np.zeros((1, X.shape[1]))
+                        artificial_index = n_obs
 
-                # There needs to be at least two unique values of the target variable
-                if np.unique(y_cluster).size < 2:
-                    art_x = np.zeros((1, X.shape[1]))
-                    artificial_index = n_obs
+                        X_cluster = np.r_[X_cluster, art_x]
+                        y_cluster = np.r_[y_cluster, -255]
 
-                    X_cluster = np.r_[X_cluster, art_x]
-                    y_cluster = np.r_[y_cluster, -255]
+                    minority_obs = y_cluster[y_cluster == target_class]
 
-                minority_obs = y_cluster[y_cluster == target_class]
+                    n_new = n_to_generate * sampling_weights[cluster]
 
-                n_new = n_to_generate * sampling_weights[cluster]
+                    temp_dic = {target_class: int(round(n_new) + minority_obs.size)}
 
-                temp_dic = {target_class: int(round(n_new) + minority_obs.size)}
+                    # We need to make sure that k_neighors is less that the number of observations in the cluster
+                    k_neighbors = minority_obs.size - 1
 
-                # We need to make sure that k_neighors is less that the number of observations in the cluster
-                k_neighbors = minority_obs.size - 1
+                    over_sampler = SMOTE(ratio=temp_dic, k_neighbors=k_neighbors, random_state=0)
+                    over_sampler.fit(X_cluster, y_cluster)
 
-                over_sampler = SMOTE(ratio=temp_dic, k_neighbors=k_neighbors, random_state=0)
-                over_sampler.fit(X_cluster, y_cluster)
+                    X_cluster_resampled, y_cluster_resampled = over_sampler.sample(X_cluster, y_cluster)
 
-                X_cluster_resampled, y_cluster_resampled = over_sampler.sample(X_cluster, y_cluster)
+                    # If there was a observation added, then it is necessary to remove it now
+                    if artificial_index > 0:
+                        X_cluster_resampled = np.delete(X_cluster_resampled, artificial_index, axis=0)
+                        y_cluster_resampled = np.delete(y_cluster_resampled, artificial_index)
 
-                # If there was a observation added, then it is necessary to remove it now
-                if artificial_index > 0:
-                    X_cluster_resampled = np.delete(X_cluster_resampled, artificial_index, axis=0)
-                    y_cluster_resampled = np.delete(y_cluster_resampled, artificial_index)
+                    # Save the newly generated samples only
+                    X_cluster_resampled = X_cluster_resampled[n_obs:, :]
+                    y_cluster_resampled = y_cluster_resampled[n_obs:, ]
 
-                # Save the newly generated samples only
-                X_cluster_resampled = X_cluster_resampled[n_obs:, :]
-                y_cluster_resampled = y_cluster_resampled[n_obs:, ]
-
-                # Add the newly generated samples to the data to be returned
-                X_resampled = np.concatenate((X_resampled, X_cluster_resampled))
-                y_resampled = np.concatenate((y_resampled, y_cluster_resampled))
+                    # Add the newly generated samples to the data to be returned
+                    X_resampled = np.concatenate((X_resampled, X_cluster_resampled))
+                    y_resampled = np.concatenate((y_resampled, y_cluster_resampled))
 
         return X_resampled, y_resampled
 
