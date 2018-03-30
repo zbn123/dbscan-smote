@@ -5,7 +5,7 @@ import numpy as np
 from scipy.spatial.distance import pdist
 from imblearn.over_sampling import SMOTE
 from warnings import filterwarnings
-
+from sklearn.exceptions import  DataConversionWarning
 
 class DBSCANSMOTE(BaseOverSampler):
     ''' Clusters the input data using DBScan and then oversamples using smote the defined clusters'''
@@ -21,24 +21,21 @@ class DBSCANSMOTE(BaseOverSampler):
                  algorithm='auto',
                  leaf_size=30,
                  p=None,
-                 n_jobs=1,
-                 dbscan_object=None):
+                 n_jobs=1):
 
         super(DBSCANSMOTE, self).__init__(ratio=ratio, random_state=random_state)
         self._normalize = normalize
 
-        if dbscan_object is None:
-            self._cluster_class = DBSCAN(
-                eps=eps,
-                min_samples=min_samples,
-                metric=metric,
-                metric_params=metric_params,
-                algorithm=algorithm,
-                leaf_size=leaf_size,
-                p=p,
-                n_jobs=n_jobs)
-        else:
-            self._cluster_class = dbscan_object
+        self._cluster_class = DBSCAN(
+            eps=eps,
+            min_samples=min_samples,
+            metric=metric,
+            metric_params=metric_params,
+            algorithm=algorithm,
+            leaf_size=leaf_size,
+            p=p,
+            n_jobs=n_jobs)
+
 
     def _fit_cluster(self, X, y=None):
         ''' Normalizes the data into a [0,1] range,
@@ -46,6 +43,8 @@ class DBSCANSMOTE(BaseOverSampler):
 
         if self._normalize:
             min_max = MinMaxScaler()
+            # When the input data is int it will give a warning when converting to double
+            filterwarnings("ignore", category=DataConversionWarning)
             X_ = min_max.fit_transform(X)
         else:
             X_ = X
@@ -65,9 +64,6 @@ class DBSCANSMOTE(BaseOverSampler):
 
         if cluster_labels is None:
             cluster_labels = self.labels
-
-        if minority_label is None:
-            minority_label = self.minority_class
 
         unique_labels = np.unique(cluster_labels)
 
@@ -93,9 +89,6 @@ class DBSCANSMOTE(BaseOverSampler):
 
         if cluster_labels is None:
             cluster_labels = self.labels
-
-        if minority_class is None:
-            minority_class = self.minority_class
 
         sparsity_factors = {}
 
