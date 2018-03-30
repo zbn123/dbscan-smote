@@ -136,66 +136,62 @@ class DBSCANSMOTE(BaseOverSampler):
 
         self.labels = self._cluster_class.labels_
 
-        # Finds the minority class
-        # To be re written for the multiclass case
-        self.minority_class = self._find_minority_label(y)
-
-        # Filters the clusters using the method in K Means SMOTE
-        clusters_to_use = self._filter_clusters(y, self._cluster_class.labels_, self.minority_class)
-
-        # Calculates the sampling weights
-        sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use, self.labels)
-
-        n_to_generate = self.ratio_[self.minority_class]
-
         X_resampled = X.copy()
         y_resampled = y.copy()
 
         filterwarnings("ignore", category=UserWarning, module="imblearn")
 
-        for cluster in sampling_weights:
-            mask = self.labels == cluster
-            X_cluster = X[mask]
-            y_cluster = y[mask]
+        for target_class in self.ratio_:
 
-            n_obs = mask.sum()
+            n_to_generate = self.ratio_[target_class]
 
-            artificial_index = -1
+            clusters_to_use = self._filter_clusters(y, self._cluster_class.labels_, target_class)
 
-            # There needs to be at least two unique values of the target variable
-            if np.unique(y_cluster).size < 2:
-                art_x = np.zeros((1, X.shape[1]))
-                artificial_index = n_obs
+            sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use, self.labels, target_class)
 
-                X_cluster = np.r_[X_cluster, art_x]
-                y_cluster = np.r_[y_cluster, -255]
+            for cluster in sampling_weights:
+                mask = self.labels == cluster
+                X_cluster = X[mask]
+                y_cluster = y[mask]
 
-            minority_obs = y_cluster[y_cluster == self.minority_class]
+                n_obs = mask.sum()
 
-            n_new = n_to_generate * sampling_weights[cluster]
+                artificial_index = -1
 
-            temp_dic = {self.minority_class: int(round(n_new) + minority_obs.size)}
+                # There needs to be at least two unique values of the target variable
+                if np.unique(y_cluster).size < 2:
+                    art_x = np.zeros((1, X.shape[1]))
+                    artificial_index = n_obs
 
-            # We need to make sure that k_neighors is less that the number of observations in the cluster
-            k_neighbors = minority_obs.size - 1
+                    X_cluster = np.r_[X_cluster, art_x]
+                    y_cluster = np.r_[y_cluster, -255]
 
-            over_sampler = SMOTE(ratio=temp_dic, k_neighbors=k_neighbors, random_state=0)
-            over_sampler.fit(X_cluster, y_cluster)
+                minority_obs = y_cluster[y_cluster == target_class]
 
-            X_cluster_resampled, y_cluster_resampled = over_sampler.sample(X_cluster, y_cluster)
+                n_new = n_to_generate * sampling_weights[cluster]
 
-            # If there was a observation added, then it is necessary to remove it now
-            if artificial_index > 0:
-                X_cluster_resampled = np.delete(X_cluster_resampled, artificial_index, axis=0)
-                y_cluster_resampled = np.delete(y_cluster_resampled, artificial_index)
+                temp_dic = {target_class: int(round(n_new) + minority_obs.size)}
 
-            # Save the newly generated samples only
-            X_cluster_resampled = X_cluster_resampled[n_obs:, :]
-            y_cluster_resampled = y_cluster_resampled[n_obs:, ]
+                # We need to make sure that k_neighors is less that the number of observations in the cluster
+                k_neighbors = minority_obs.size - 1
 
-            # Add the newly generated samples to the data to be returned
-            X_resampled = np.concatenate((X_resampled, X_cluster_resampled))
-            y_resampled = np.concatenate((y_resampled, y_cluster_resampled))
+                over_sampler = SMOTE(ratio=temp_dic, k_neighbors=k_neighbors, random_state=0)
+                over_sampler.fit(X_cluster, y_cluster)
+
+                X_cluster_resampled, y_cluster_resampled = over_sampler.sample(X_cluster, y_cluster)
+
+                # If there was a observation added, then it is necessary to remove it now
+                if artificial_index > 0:
+                    X_cluster_resampled = np.delete(X_cluster_resampled, artificial_index, axis=0)
+                    y_cluster_resampled = np.delete(y_cluster_resampled, artificial_index)
+
+                # Save the newly generated samples only
+                X_cluster_resampled = X_cluster_resampled[n_obs:, :]
+                y_cluster_resampled = y_cluster_resampled[n_obs:, ]
+
+                # Add the newly generated samples to the data to be returned
+                X_resampled = np.concatenate((X_resampled, X_cluster_resampled))
+                y_resampled = np.concatenate((y_resampled, y_cluster_resampled))
 
         return X_resampled, y_resampled
 
