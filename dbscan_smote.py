@@ -147,33 +147,7 @@ class DBSCANSMOTE(BaseOverSampler):
 
                 # In case we do not have cluster where the target class it dominant, we apply regular SMOTE
                 if not clusters_to_use and n_to_generate > 0:
-                    warn("Class does not have a cluster where is dominant. Applying Regular SMOTE")
-                    X_cluster = X.copy()
-                    y_cluster = y.copy()
-
-                    n_obs = X_cluster.shape[0]
-
-                    minority_obs = y_cluster[y_cluster == target_class]
-
-                    temp_dic = {target_class: n_to_generate + minority_obs.size}
-
-                    if self.k_neighbors > minority_obs.size - 1:
-                        k_neighbors = minority_obs.size - 1
-                    else:
-                        k_neighbors = self.k_neighbors
-
-                    over_sampler = SMOTE(ratio=temp_dic, k_neighbors=k_neighbors)
-                    over_sampler.fit(X_cluster, y_cluster)
-
-                    X_cluster_resampled, y_cluster_resampled = over_sampler.sample(X_cluster, y_cluster)
-
-                    # Save the newly generated samples only
-                    X_cluster_resampled = X_cluster_resampled[n_obs:, :]
-                    y_cluster_resampled = y_cluster_resampled[n_obs:, ]
-
-                    # Add the newly generated samples to the data to be returned
-                    X_resampled = np.concatenate((X_resampled, X_cluster_resampled))
-                    y_resampled = np.concatenate((y_resampled, y_cluster_resampled))
+                    warn("Class does not have a cluster where is dominant.")
 
                 else:
                     sampling_weights = self._calculate_sampling_weights(X, y, clusters_to_use, self.labels, target_class)
